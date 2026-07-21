@@ -1,6 +1,6 @@
 *.sh text eol=lf
 *.bash text eol=lf
-bin/rackprobe text eol=lf
+bin/gpu-sentry text eol=lf
 Makefile text eol=lf
 *.yml text eol=lf
 

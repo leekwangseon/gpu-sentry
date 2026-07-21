@@ -10,11 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate tag and version
-        run: test "${GITHUB_REF_NAME#v}" = "$(./bin/rackprobe --version | awk '{print $2}')"
+        run: test "${GITHUB_REF_NAME#v}" = "$(./bin/gpu-sentry --version | awk '{print $2}')"
       - name: Build archive
-        run: git archive --format=tar.gz --prefix="rackprobe-${GITHUB_REF_NAME#v}/" -o "rackprobe-${GITHUB_REF_NAME#v}.tar.gz" HEAD
+        run: git archive --format=tar.gz --prefix="gpu-sentry-${GITHUB_REF_NAME#v}/" -o "gpu-sentry-${GITHUB_REF_NAME#v}.tar.gz" HEAD
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: rackprobe-*.tar.gz
+          files: gpu-sentry-*.tar.gz
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-../bin/rackprobe --host gpu01 --inventory-only
+../bin/gpu-sentry --host gpu01 --inventory-only
 

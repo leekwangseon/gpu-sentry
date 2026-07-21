@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 install_gpu_burn() {
-    local archive_remote=/tmp/rackprobe-gpu-burn.tar.gz
+    local archive_remote=/tmp/gpu-sentry-gpu-burn.tar.gz
     local offline_archive="$PROJECT_ROOT/tools/gpu-burn/gpu-burn.tar.gz"
     if transport_exec "test -x '$GPU_BURN_BIN' && test -s '$GPU_BURN_DIR/compare.fatbin'"; then
         log INFO "Using existing gpu-burn at $GPU_BURN_BIN"

@@ -6,17 +6,17 @@ PREFIX ?= /usr/local
 all: lint test
 
 lint:
-	shellcheck bin/rackprobe lib/*.sh tests/*.bash
+	shellcheck bin/gpu-sentry lib/*.sh tests/*.bash
 
 test:
 	bash tests/run.bash
 
 install:
-	install -d "$(DESTDIR)$(PREFIX)/lib/rackprobe" "$(DESTDIR)$(PREFIX)/bin"
-	install -m 0644 lib/*.sh "$(DESTDIR)$(PREFIX)/lib/rackprobe/"
-	install -m 0755 bin/rackprobe "$(DESTDIR)$(PREFIX)/bin/rackprobe"
+	install -d "$(DESTDIR)$(PREFIX)/lib/gpu-sentry" "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0644 lib/*.sh "$(DESTDIR)$(PREFIX)/lib/gpu-sentry/"
+	install -m 0755 bin/gpu-sentry "$(DESTDIR)$(PREFIX)/bin/gpu-sentry"
 
 uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/rackprobe"
-	rm -rf "$(DESTDIR)$(PREFIX)/lib/rackprobe"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/gpu-sentry"
+	rm -rf "$(DESTDIR)$(PREFIX)/lib/gpu-sentry"
 

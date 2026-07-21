@@ -1,6 +1,6 @@
 # Architecture
 
-`bin/rackprobe` owns argument parsing and orchestration. Library modules are
+`bin/gpu-sentry` owns argument parsing and orchestration. Library modules are
 small capability boundaries: transport, inventory, GPU testing, installation,
 analysis, and reporting. All remote commands go through `lib/ssh.sh`, allowing
 collectors to work unchanged in local and SSH modes.

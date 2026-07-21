@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-RACKPROBE_VERSION="0.2.0"
+GPU_SENTRY_VERSION="0.3.0"
 
 die() {
     log ERROR "$*"
