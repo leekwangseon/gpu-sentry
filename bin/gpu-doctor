@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# The orchestrator shares configuration variables with sourced modules.
+# shellcheck disable=SC1091,SC2034
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [[ -d $SCRIPT_DIR/../lib ]]; then
+    PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+    LIB_DIR=$PROJECT_ROOT/lib
+else
+    PROJECT_ROOT=/usr/local/share/gpu-doctor
+    LIB_DIR=/usr/local/lib/gpu-doctor
+fi
+
+# shellcheck source=../lib/common.sh
+source "$LIB_DIR/common.sh"
+# shellcheck source=../lib/ssh.sh
+source "$LIB_DIR/ssh.sh"
+# shellcheck source=../lib/hardware.sh
+source "$LIB_DIR/hardware.sh"
+# shellcheck source=../lib/gpu.sh
+source "$LIB_DIR/gpu.sh"
+# shellcheck source=../lib/install.sh
+source "$LIB_DIR/install.sh"
+# shellcheck source=../lib/analyze.sh
+source "$LIB_DIR/analyze.sh"
+# shellcheck source=../lib/report.sh
+source "$LIB_DIR/report.sh"
+
+usage() {
+    cat <<'USAGE'
+Usage: gpu-doctor (--local | --host HOST) [options]
+
+Options:
+  --local                 Diagnose this server
+  --host HOST             Diagnose a server over SSH
+  --power WATTS           Set an NVIDIA power limit during the run (default: unchanged)
+  --time SECONDS          Duration of each test (default: 300)
+  --cooldown SECONDS      Pause between tests (default: 60)
+  --interval SECONDS      Telemetry interval (default: 2)
+  --output DIRECTORY      Log root (default: ./logs)
+  --gpu-burn PATH         gpu-burn executable path (default: /opt/gpu-burn/gpu_burn)
+  --continue-on-failure   Continue remaining tests after a failure
+  --inventory-only       Skip gpu-burn installation and stress tests
+  --version               Print version
+  -h, --help              Show help
+USAGE
+}
+
+MODE=""; TARGET_HOST=""; POWER_LIMIT=0; TEST_TIME=300; COOLDOWN=60; INTERVAL=2
+OUTPUT_ROOT="$PROJECT_ROOT/logs"; GPU_BURN_DIR=/opt/gpu-burn; GPU_BURN_BIN=$GPU_BURN_DIR/gpu_burn
+GPU_BURN_REPO=https://github.com/wilicc/gpu-burn.git
+GPU_BURN_ARCHIVE=https://github.com/wilicc/gpu-burn/archive/refs/heads/master.tar.gz
+STOP_ON_FAILURE=1; INVENTORY_ONLY=0
+
+while (($#)); do
+    case $1 in
+        --local) MODE=local; TARGET_HOST=localhost; shift ;;
+        --host) [[ $# -ge 2 ]] || die "--host requires a value"; MODE=ssh; TARGET_HOST=$2; shift 2 ;;
+        --power) [[ $# -ge 2 ]] || die "--power requires a value"; POWER_LIMIT=$2; shift 2 ;;
+        --time) [[ $# -ge 2 ]] || die "--time requires a value"; TEST_TIME=$2; shift 2 ;;
+        --cooldown) [[ $# -ge 2 ]] || die "--cooldown requires a value"; COOLDOWN=$2; shift 2 ;;
+        --interval) [[ $# -ge 2 ]] || die "--interval requires a value"; INTERVAL=$2; shift 2 ;;
+        --output) [[ $# -ge 2 ]] || die "--output requires a value"; OUTPUT_ROOT=$2; shift 2 ;;
+        --gpu-burn) [[ $# -ge 2 ]] || die "--gpu-burn requires a value"; GPU_BURN_BIN=$2; GPU_BURN_DIR=$(dirname "$2"); shift 2 ;;
+        --continue-on-failure) STOP_ON_FAILURE=0; shift ;;
+        --inventory-only) INVENTORY_ONLY=1; shift ;;
+        --version) printf 'gpu-doctor %s\n' "$GPU_DOCTOR_VERSION"; exit 0 ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; die "Unknown option: $1" ;;
+    esac
+done
+
+[[ -n $MODE ]] || { usage >&2; die "Choose exactly one of --local or --host"; }
+for numeric in POWER_LIMIT TEST_TIME COOLDOWN INTERVAL; do
+    value=${!numeric}; [[ $value =~ ^[0-9]+$ ]] || die "$numeric must be a non-negative integer"
+done
+(( TEST_TIME > 0 && INTERVAL > 0 )) || die "--time and --interval must be greater than zero"
+
+REPORT_HOST=$(safe_name "$TARGET_HOST")
+RUN_DATE=$(date +%Y%m%d)
+RUN_DIR="$OUTPUT_ROOT/$RUN_DATE/$REPORT_HOST"
+mkdir -p "$RUN_DIR"
+MAIN_LOG=$RUN_DIR/main.log; GPU_CSV=$RUN_DIR/gpu.csv; DMESG_LOG=$RUN_DIR/dmesg.log
+HTML_REPORT=$RUN_DIR/report.html; PDF_REPORT=$RUN_DIR/report.pdf
+HARDWARE_TSV=$RUN_DIR/hardware.tsv; GPU_INVENTORY=$RUN_DIR/gpu-inventory.csv
+GPU_DETAIL_LOG=$RUN_DIR/gpu-detail.log; PCIE_LOG=$RUN_DIR/pcie-topology.log
+VENDOR_LOG=$RUN_DIR/vendor.log; TEST_PLAN=$RUN_DIR/test-plan.tsv
+RESULTS_TSV=$RUN_DIR/results.tsv; ANALYSIS_TSV=$RUN_DIR/analysis.tsv
+ORIGINAL_POWER_LIMITS=$RUN_DIR/original-power-limits.tsv
+GPU_MONITOR_PID=""
+
+cleanup() { stop_gpu_monitor; restore_power_limits; }
+trap cleanup EXIT INT TERM
+
+log INFO "gpu-doctor $GPU_DOCTOR_VERSION starting for $TARGET_HOST ($MODE)"
+transport_check
+collect_hardware
+collect_vendor_data
+collect_gpu_inventory
+generate_test_plan "$GPU_COUNT"
+printf 'test\tdevices\tstarted\tended\tresult\trc\n' >"$RESULTS_TSV"
+stress_rc=0
+if (( INVENTORY_ONLY == 0 )); then
+    install_gpu_burn
+    apply_power_limit
+    start_gpu_monitor
+    run_stress_tests || stress_rc=$?
+    stop_gpu_monitor
+else
+    log INFO "Inventory-only mode: stress tests skipped"
+    transport_exec 'nvidia-smi --query-gpu=timestamp,index,uuid,name,temperature.gpu,power.draw,power.limit,utilization.gpu,utilization.memory,memory.used,memory.total,pstate,clocks.sm --format=csv,noheader,nounits' >"$GPU_CSV" 2>>"$MAIN_LOG" || true
+    sed -i '1i timestamp,index,uuid,name,temp_c,power_w,power_limit_w,gpu_util_pct,memory_util_pct,memory_used_mib,memory_total_mib,pstate,sm_clock_mhz' "$GPU_CSV"
+fi
+collect_kernel_logs
+analyze_logs
+(( stress_rc == 0 )) || OVERALL_STATUS=FAIL
+generate_html_report
+generate_pdf_report
+restore_power_limits
+log INFO "Completed with status $OVERALL_STATUS; report: $HTML_REPORT"
+(( stress_rc == 0 ))

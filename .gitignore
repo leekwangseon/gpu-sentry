@@ -1,0 +1,8 @@
+logs/
+reports/*
+!reports/.gitkeep
+tools/gpu-burn/gpu_burn
+tools/gpu-burn/compare.fatbin
+*.tmp
+*.swp
+
