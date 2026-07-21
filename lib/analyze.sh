@@ -9,7 +9,10 @@ collect_kernel_logs() {
 analyze_logs() {
     local xid_list overall=PASS
     : >"$ANALYSIS_TSV"
-    xid_list=$(grep -Eio 'NVRM: Xid[^0-9]*[0-9]+' "$DMESG_LOG" | grep -Eo '[0-9]+$' | sort -nu || true)
+    xid_list=$(sed -nE \
+        -e 's/.*NVRM: Xid[^)]*\):[[:space:]]*([0-9]+).*/\1/p' \
+        -e 's/.*NVRM: Xid[[:space:]]+([0-9]+).*/\1/p' \
+        "$DMESG_LOG" | sort -nu || true)
     while IFS= read -r xid; do
         [[ -n $xid ]] || continue
         overall=FAIL
