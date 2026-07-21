@@ -6,17 +6,17 @@ PREFIX ?= /usr/local
 all: lint test
 
 lint:
-	shellcheck bin/gpu-doctor lib/*.sh tests/*.bash
+	shellcheck bin/rackprobe lib/*.sh tests/*.bash
 
 test:
 	bash tests/run.bash
 
 install:
-	install -d "$(DESTDIR)$(PREFIX)/lib/gpu-doctor" "$(DESTDIR)$(PREFIX)/bin"
-	install -m 0644 lib/*.sh "$(DESTDIR)$(PREFIX)/lib/gpu-doctor/"
-	install -m 0755 bin/gpu-doctor "$(DESTDIR)$(PREFIX)/bin/gpu-doctor"
+	install -d "$(DESTDIR)$(PREFIX)/lib/rackprobe" "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0644 lib/*.sh "$(DESTDIR)$(PREFIX)/lib/rackprobe/"
+	install -m 0755 bin/rackprobe "$(DESTDIR)$(PREFIX)/bin/rackprobe"
 
 uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/gpu-doctor"
-	rm -rf "$(DESTDIR)$(PREFIX)/lib/gpu-doctor"
+	rm -f "$(DESTDIR)$(PREFIX)/bin/rackprobe"
+	rm -rf "$(DESTDIR)$(PREFIX)/lib/rackprobe"
 

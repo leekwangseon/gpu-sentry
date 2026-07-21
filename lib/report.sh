@@ -16,9 +16,9 @@ generate_html_report() {
     max_temp=$(metric_max 5); avg_temp=$(metric_avg 5); max_power=$(metric_max 6)
     avg_gpu=$(metric_avg 8); avg_mem=$(metric_avg 9)
     {
-        printf '%s\n' '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>GPU Doctor Report</title>'
+        printf '%s\n' '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>RackProbe Report</title>'
         printf '%s\n' '<style>body{font:14px system-ui;margin:32px;color:#172033}header{border-bottom:4px solid #2563eb;padding-bottom:16px}h1{margin:0}.status{display:inline-block;padding:6px 14px;border-radius:20px;color:white;background:#15803d}.FAIL{background:#b91c1c}table{border-collapse:collapse;width:100%;margin:14px 0}th,td{border:1px solid #d8dee9;padding:8px;text-align:left}th{background:#eef2ff}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{border:1px solid #d8dee9;border-radius:8px;padding:12px;min-width:130px}.muted{color:#64748b}@media print{body{margin:10mm}}</style></head><body>'
-        printf '<header><h1>GPU Doctor Diagnostic Report</h1><p class="muted">Host: %s · Generated: %s · Version: %s</p><span class="status %s">%s</span></header>\n' "$(html_escape "$REPORT_HOST")" "$(date -u '+%FT%TZ')" "$GPU_DOCTOR_VERSION" "$OVERALL_STATUS" "$OVERALL_STATUS"
+        printf '<header><h1>RackProbe Diagnostic Report</h1><p class="muted">Host: %s · Generated: %s · Version: %s</p><span class="status %s">%s</span></header>\n' "$(html_escape "$REPORT_HOST")" "$(date -u '+%FT%TZ')" "$RACKPROBE_VERSION" "$OVERALL_STATUS" "$OVERALL_STATUS"
         printf '<h2>Summary</h2><div class="cards"><div class="card"><b>GPUs</b><br>%s</div><div class="card"><b>Driver</b><br>%s</div><div class="card"><b>CUDA</b><br>%s</div><div class="card"><b>Max temperature</b><br>%s °C</div><div class="card"><b>Avg temperature</b><br>%s °C</div><div class="card"><b>Max power</b><br>%s W</div><div class="card"><b>Avg GPU util</b><br>%s%%</div><div class="card"><b>Avg memory util</b><br>%s%%</div></div>\n' "$GPU_COUNT" "$(html_escape "$DRIVER_VERSION")" "$(html_escape "$CUDA_VERSION")" "$max_temp" "$avg_temp" "$max_power" "$avg_gpu" "$avg_mem"
         printf '%s\n' '<h2>Host hardware</h2><table><tr><th>Item</th><th>Value</th></tr>'
         while IFS=$'\t' read -r key value; do printf '<tr><td>%s</td><td>%s</td></tr>\n' "$(html_escape "$key")" "$(html_escape "$value")"; done <"$HARDWARE_TSV"
@@ -44,10 +44,10 @@ generate_pdf_report() {
     elif command -v chromium >/dev/null 2>&1; then
         chromium --headless --no-sandbox --disable-gpu --print-to-pdf="$PDF_REPORT" "file://$HTML_REPORT" >/dev/null 2>&1 || true
     elif command -v python3 >/dev/null 2>&1; then
-        GPU_DOCTOR_PDF=$PDF_REPORT GPU_DOCTOR_HOST=$REPORT_HOST GPU_DOCTOR_STATUS=$OVERALL_STATUS python3 - <<'PY'
+        RACKPROBE_PDF=$PDF_REPORT RACKPROBE_HOST=$REPORT_HOST RACKPROBE_STATUS=$OVERALL_STATUS python3 - <<'PY'
 import os
-p=os.environ["GPU_DOCTOR_PDF"]
-lines=["GPU Doctor Diagnostic Report",f"Host: {os.environ['GPU_DOCTOR_HOST']}",f"Status: {os.environ['GPU_DOCTOR_STATUS']}","See report.html and raw logs for complete details."]
+p=os.environ["RACKPROBE_PDF"]
+lines=["RackProbe Diagnostic Report",f"Host: {os.environ['RACKPROBE_HOST']}",f"Status: {os.environ['RACKPROBE_STATUS']}","See report.html and raw logs for complete details."]
 stream="BT /F1 18 Tf 72 760 Td "+" Tj 0 -28 Td ".join("("+s.replace("\\","\\\\").replace("(","\\(").replace(")","\\)")+")" for s in lines)+" Tj ET"
 objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>","<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream","<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
 data="%PDF-1.4\n"; offsets=[0]

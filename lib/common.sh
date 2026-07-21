@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-GPU_DOCTOR_VERSION="0.1.0"
+RACKPROBE_VERSION="0.2.0"
 
 die() {
     log ERROR "$*"
