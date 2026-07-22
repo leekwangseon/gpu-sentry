@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
 
-detect_cuda() {
-    local script
-    script='set +u
-source /etc/profile >/dev/null 2>&1 || true
-source /etc/profile.d/modules.sh >/dev/null 2>&1 || true
-source /etc/profile.d/lmod.sh >/dev/null 2>&1 || true
-if command -v nvcc >/dev/null 2>&1; then nvcc --version; exit 0; fi
-if command -v module >/dev/null 2>&1; then
-  module -t avail cuda 2>&1 | sed -n "s#^.*/\{0,1\}\(cuda[^[:space:]]*\).*#\1#p" | sort -V | tail -n1 | xargs -r module load
-fi
-command -v nvcc >/dev/null 2>&1 && nvcc --version'
-    CUDA_INFO=$(transport_exec "$script" 2>/dev/null || true)
-    CUDA_VERSION=$(printf '%s\n' "$CUDA_INFO" | sed -n 's/.*release \([0-9][0-9.]*\).*/\1/p' | head -n1)
-    CUDA_VERSION=${CUDA_VERSION:-unknown}
-}
-
 collect_gpu_inventory() {
     log INFO "Collecting NVIDIA GPU inventory"
     transport_exec 'command -v nvidia-smi >/dev/null 2>&1 || exit 127

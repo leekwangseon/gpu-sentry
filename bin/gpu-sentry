@@ -18,6 +18,8 @@ source "$LIB_DIR/common.sh"
 source "$LIB_DIR/ssh.sh"
 # shellcheck source=../lib/hardware.sh
 source "$LIB_DIR/hardware.sh"
+# shellcheck source=../lib/cuda.sh
+source "$LIB_DIR/cuda.sh"
 # shellcheck source=../lib/gpu.sh
 source "$LIB_DIR/gpu.sh"
 # shellcheck source=../lib/install.sh
@@ -39,6 +41,7 @@ Options:
   --cooldown SECONDS      Pause between tests (default: 60)
   --interval SECONDS      Telemetry interval (default: 2)
   --output DIRECTORY      Log root (default: ./logs)
+  --cuda-home DIRECTORY   Use this CUDA Toolkit root on the target
   --gpu-burn PATH         gpu-burn executable path (default: /opt/gpu-burn/gpu_burn)
   --continue-on-failure   Continue remaining tests after a failure
   --inventory-only       Skip gpu-burn installation and stress tests
@@ -51,7 +54,7 @@ MODE=""; TARGET_HOST=""; POWER_LIMIT=0; TEST_TIME=300; COOLDOWN=60; INTERVAL=2
 OUTPUT_ROOT="$PROJECT_ROOT/logs"; GPU_BURN_DIR=/opt/gpu-burn; GPU_BURN_BIN=$GPU_BURN_DIR/gpu_burn
 GPU_BURN_REPO=https://github.com/wilicc/gpu-burn.git
 GPU_BURN_ARCHIVE=https://github.com/wilicc/gpu-burn/archive/refs/heads/master.tar.gz
-STOP_ON_FAILURE=1; INVENTORY_ONLY=0
+STOP_ON_FAILURE=1; INVENTORY_ONLY=0; CUDA_HOME_OVERRIDE=""
 
 while (($#)); do
     case $1 in
@@ -62,6 +65,7 @@ while (($#)); do
         --cooldown) [[ $# -ge 2 ]] || die "--cooldown requires a value"; COOLDOWN=$2; shift 2 ;;
         --interval) [[ $# -ge 2 ]] || die "--interval requires a value"; INTERVAL=$2; shift 2 ;;
         --output) [[ $# -ge 2 ]] || die "--output requires a value"; OUTPUT_ROOT=$2; shift 2 ;;
+        --cuda-home) [[ $# -ge 2 ]] || die "--cuda-home requires a value"; CUDA_HOME_OVERRIDE=$2; shift 2 ;;
         --gpu-burn) [[ $# -ge 2 ]] || die "--gpu-burn requires a value"; GPU_BURN_BIN=$2; GPU_BURN_DIR=$(dirname "$2"); shift 2 ;;
         --continue-on-failure) STOP_ON_FAILURE=0; shift ;;
         --inventory-only) INVENTORY_ONLY=1; shift ;;

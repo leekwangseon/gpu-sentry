@@ -15,14 +15,16 @@ install_gpu_burn() {
         archive_remote=""
     fi
 
-    log INFO "Installing gpu-burn; privileges may be required for $GPU_BURN_DIR"
-    transport_stream_script "$GPU_BURN_DIR" "$GPU_BURN_REPO" "$GPU_BURN_ARCHIVE" "$archive_remote" \
+    [[ $CUDA_HOME_DETECTED != unknown ]] || die "CUDA Toolkit is required to build gpu-burn; specify --cuda-home if auto-discovery failed"
+    log INFO "Installing gpu-burn with CUDA at $CUDA_HOME_DETECTED; privileges may be required for $GPU_BURN_DIR"
+    transport_stream_script "$GPU_BURN_DIR" "$GPU_BURN_REPO" "$GPU_BURN_ARCHIVE" "$archive_remote" "$CUDA_HOME_DETECTED" \
         >>"$MAIN_LOG" 2>&1 <<'INSTALL_SCRIPT'
 set -euo pipefail
 GPU_BURN_DIR=$1
 GPU_BURN_REPO=$2
 GPU_BURN_ARCHIVE=$3
 OFFLINE_ARCHIVE=$4
+CUDA_HOME_DETECTED=$5
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 source_dir="$work/source"
@@ -43,20 +45,10 @@ fetch() {
     return 24
 }
 
-set +u
-source /etc/profile >/dev/null 2>&1 || true
-source /etc/profile.d/modules.sh >/dev/null 2>&1 || true
-source /etc/profile.d/lmod.sh >/dev/null 2>&1 || true
-set -u
-if ! command -v nvcc >/dev/null 2>&1 && command -v module >/dev/null 2>&1; then
-    cuda_module=$(module -t avail cuda 2>&1 | grep -E 'cuda[/@-]?[0-9]' | sort -V | tail -n1 || true)
-    [[ -n $cuda_module ]] && module load "$cuda_module"
-fi
-command -v nvcc >/dev/null 2>&1 || { echo "nvcc not found" >&2; exit 21; }
+[[ -x $CUDA_HOME_DETECTED/bin/nvcc && -f $CUDA_HOME_DETECTED/include/cuda.h ]] || { echo "Invalid CUDA Toolkit: $CUDA_HOME_DETECTED" >&2; exit 21; }
 for cmd in make g++ tar; do command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd not found" >&2; exit 23; }; done
-cuda_home=$(dirname "$(dirname "$(readlink -f "$(command -v nvcc)")")")
 fetch
-make -C "$source_dir" CUDAPATH="$cuda_home" NVCCFLAGS=-allow-unsupported-compiler
+make -C "$source_dir" CUDAPATH="$CUDA_HOME_DETECTED" NVCCFLAGS=-allow-unsupported-compiler
 install_cmd=install
 [[ -w $(dirname "$GPU_BURN_DIR") ]] || install_cmd='sudo install'
 $install_cmd -d "$GPU_BURN_DIR"
