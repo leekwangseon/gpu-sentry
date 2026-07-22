@@ -1,9 +1,37 @@
 #!/usr/bin/env bash
+# Remote command bodies are intentionally single-quoted for target-side expansion.
+# shellcheck disable=SC2016
 
 collect_gpu_inventory() {
     log INFO "Collecting NVIDIA GPU inventory"
-    transport_exec 'command -v nvidia-smi >/dev/null 2>&1 || exit 127
-nvidia-smi --query-gpu=index,uuid,name,driver_version,pci.bus_id,pci.link.gen.current,pci.link.gen.max,pci.link.width.current,pci.link.width.max,temperature.gpu,power.limit,memory.total,compute_cap --format=csv,noheader,nounits' >"$GPU_INVENTORY" 2>>"$MAIN_LOG" || die "nvidia-smi failed or is not installed"
+    transport_exec 'set -euo pipefail
+command -v nvidia-smi >/dev/null 2>&1 || exit 127
+work=$(mktemp -d)
+trap '\''rm -rf "$work"'\'' EXIT
+format=csv,noheader,nounits
+
+# Keep optional fields isolated: older drivers reject the entire query when one
+# field (for example compute_cap) is unknown.
+nvidia-smi --query-gpu=index,uuid,name,driver_version,pci.bus_id --format="$format" >"$work/identity"
+nvidia-smi --query-gpu=temperature.gpu,power.limit,memory.total --format="$format" >"$work/metrics"
+count=$(wc -l <"$work/identity")
+
+query_optional() {
+    local field=$1 output=$2
+    if ! nvidia-smi --query-gpu="$field" --format="$format" >"$output" 2>/dev/null; then
+        awk -v count="$count" '\''BEGIN {for (i=0; i<count; i++) print "unknown"}'\'' >"$output"
+    fi
+}
+
+query_optional pci.link.gen.current "$work/gen-current"
+query_optional pci.link.gen.max "$work/gen-max"
+query_optional pci.link.width.current "$work/width-current"
+query_optional pci.link.width.max "$work/width-max"
+query_optional compute_cap "$work/compute-cap"
+
+paste -d, "$work/identity" "$work/gen-current" "$work/gen-max" \
+    "$work/width-current" "$work/width-max" "$work/metrics" "$work/compute-cap"' \
+        >"$GPU_INVENTORY" 2>>"$MAIN_LOG" || die "nvidia-smi inventory collection failed; see $MAIN_LOG"
     GPU_COUNT=$(wc -l <"$GPU_INVENTORY" | tr -d ' ')
     (( GPU_COUNT > 0 )) || die "No NVIDIA GPUs detected"
     DRIVER_VERSION=$(awk -F ', *' 'NR==1 {print $4}' "$GPU_INVENTORY")

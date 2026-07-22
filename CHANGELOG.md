@@ -5,6 +5,15 @@ this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-22
+
+### Fixed
+
+- Prevented unsupported optional `nvidia-smi` query fields such as `compute_cap`
+  from aborting inventory collection on older NVIDIA drivers.
+- Optional PCIe and compute-capability fields now degrade individually to
+  `unknown` while required GPU inventory remains available.
+
 ## [0.4.0] - 2026-07-22
 
 ### Added
@@ -43,7 +52,8 @@ this project follows [Semantic Versioning](https://semver.org/).
 - Extensible Dell, Lenovo, and IPMI vendor collectors.
 - ShellCheck and release automation.
 
-[Unreleased]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.1.0...v0.2.0
