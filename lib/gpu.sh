@@ -31,7 +31,7 @@ query_optional compute_cap "$work/compute-cap"
 
 paste -d, "$work/identity" "$work/gen-current" "$work/gen-max" \
     "$work/width-current" "$work/width-max" "$work/metrics" "$work/compute-cap"' \
-        >"$GPU_INVENTORY" 2>>"$MAIN_LOG" || die "nvidia-smi inventory collection failed; see $MAIN_LOG"
+        >"$GPU_INVENTORY" 2>>"$MAIN_LOG" || die_code 4 "nvidia-smi inventory collection failed; see $MAIN_LOG"
     GPU_COUNT=$(wc -l <"$GPU_INVENTORY" | tr -d ' ')
     (( GPU_COUNT > 0 )) || die "No NVIDIA GPUs detected"
     DRIVER_VERSION=$(awk -F ', *' 'NR==1 {print $4}' "$GPU_INVENTORY")
@@ -44,6 +44,14 @@ paste -d, "$work/identity" "$work/gen-current" "$work/gen-max" \
 generate_test_plan() {
     local count=$1 i pair_start half group
     : >"$TEST_PLAN"
+    if [[ ${PLAN_LEVEL:-standard} == none ]]; then
+        return 0
+    fi
+    if [[ ${PLAN_LEVEL:-standard} == quick ]]; then
+        group=$(seq -s, 0 "$((count - 1))")
+        printf 'all-quick\t%s\n' "$group" >>"$TEST_PLAN"
+        return 0
+    fi
     for ((i = 0; i < count; i++)); do
         printf 'single-%02d\t%s\n' "$i" "$i" >>"$TEST_PLAN"
     done

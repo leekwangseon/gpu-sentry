@@ -14,7 +14,7 @@ transport_check() {
         return 0
     fi
     require_command ssh
-    ssh "${SSH_OPTIONS[@]}" "$TARGET_HOST" true || die "Cannot connect to $TARGET_HOST"
+    ssh "${SSH_OPTIONS[@]}" "$TARGET_HOST" true || die_code 3 "Cannot connect to $TARGET_HOST"
 }
 
 transport_exec() {

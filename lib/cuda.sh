@@ -111,7 +111,7 @@ detect_cuda() {
     rc=$?
     set -e
     if [[ -n ${CUDA_HOME_OVERRIDE:-} && $rc -ne 0 ]]; then
-        die "Invalid target CUDA Toolkit path: $CUDA_HOME_OVERRIDE"
+        die_code 4 "Invalid target CUDA Toolkit path: $CUDA_HOME_OVERRIDE"
     fi
     if [[ -z $result ]]; then
         CUDA_HOME_DETECTED=unknown

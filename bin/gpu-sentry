@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The orchestrator shares configuration variables with sourced modules.
-# shellcheck disable=SC1091,SC2034
+# shellcheck disable=SC1091,SC2034,SC2329
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -18,6 +18,10 @@ source "$LIB_DIR/common.sh"
 source "$LIB_DIR/ssh.sh"
 # shellcheck source=../lib/hardware.sh
 source "$LIB_DIR/hardware.sh"
+# shellcheck source=../lib/profile.sh
+source "$LIB_DIR/profile.sh"
+# shellcheck source=../lib/preflight.sh
+source "$LIB_DIR/preflight.sh"
 # shellcheck source=../lib/cuda.sh
 source "$LIB_DIR/cuda.sh"
 # shellcheck source=../lib/gpu.sh
@@ -26,6 +30,10 @@ source "$LIB_DIR/gpu.sh"
 source "$LIB_DIR/install.sh"
 # shellcheck source=../lib/analyze.sh
 source "$LIB_DIR/analyze.sh"
+# shellcheck source=../lib/dcgm.sh
+source "$LIB_DIR/dcgm.sh"
+# shellcheck source=../lib/json.sh
+source "$LIB_DIR/json.sh"
 # shellcheck source=../lib/report.sh
 source "$LIB_DIR/report.sh"
 
@@ -36,6 +44,7 @@ Usage: gpu-sentry (--local | --host HOST) [options]
 Options:
   --local                 Diagnose this server
   --host HOST             Diagnose a server over SSH
+  --profile NAME          inventory, quick, standard, burn-in, or rma
   --power WATTS           Set an NVIDIA power limit during the run (default: unchanged)
   --time SECONDS          Duration of each test (default: 300)
   --cooldown SECONDS      Pause between tests (default: 60)
@@ -43,6 +52,9 @@ Options:
   --output DIRECTORY      Log root (default: ./logs)
   --cuda-home DIRECTORY   Use this CUDA Toolkit root on the target
   --gpu-burn PATH         gpu-burn executable path (default: /opt/gpu-burn/gpu_burn)
+  --max-start-temp C      Block stress above this starting temperature (default: 80)
+  --min-free-mb MiB       Required local log disk space (default: 500)
+  --force                 Continue despite failed safety preflight checks
   --continue-on-failure   Continue remaining tests after a failure
   --inventory-only       Skip gpu-burn installation and stress tests
   --version               Print version
@@ -50,47 +62,54 @@ Options:
 USAGE
 }
 
-MODE=""; TARGET_HOST=""; POWER_LIMIT=0; TEST_TIME=300; COOLDOWN=60; INTERVAL=2
+MODE=""; TARGET_HOST=""; PROFILE=standard; POWER_LIMIT=0; TEST_TIME=300; COOLDOWN=60; INTERVAL=2
 OUTPUT_ROOT="$PROJECT_ROOT/logs"; GPU_BURN_DIR=/opt/gpu-burn; GPU_BURN_BIN=$GPU_BURN_DIR/gpu_burn
 GPU_BURN_REPO=https://github.com/wilicc/gpu-burn.git
 GPU_BURN_ARCHIVE=https://github.com/wilicc/gpu-burn/archive/refs/heads/master.tar.gz
-STOP_ON_FAILURE=1; INVENTORY_ONLY=0; CUDA_HOME_OVERRIDE=""
+STOP_ON_FAILURE=1; INVENTORY_ONLY=0; CUDA_HOME_OVERRIDE=""; FORCE_RUN=0
+MAX_START_TEMP=80; MIN_FREE_MB=500; TIME_EXPLICIT=0; COOLDOWN_EXPLICIT=0
 
 while (($#)); do
     case $1 in
         --local) MODE=local; TARGET_HOST=localhost; shift ;;
-        --host) [[ $# -ge 2 ]] || die "--host requires a value"; MODE=ssh; TARGET_HOST=$2; shift 2 ;;
-        --power) [[ $# -ge 2 ]] || die "--power requires a value"; POWER_LIMIT=$2; shift 2 ;;
-        --time) [[ $# -ge 2 ]] || die "--time requires a value"; TEST_TIME=$2; shift 2 ;;
-        --cooldown) [[ $# -ge 2 ]] || die "--cooldown requires a value"; COOLDOWN=$2; shift 2 ;;
-        --interval) [[ $# -ge 2 ]] || die "--interval requires a value"; INTERVAL=$2; shift 2 ;;
-        --output) [[ $# -ge 2 ]] || die "--output requires a value"; OUTPUT_ROOT=$2; shift 2 ;;
-        --cuda-home) [[ $# -ge 2 ]] || die "--cuda-home requires a value"; CUDA_HOME_OVERRIDE=$2; shift 2 ;;
-        --gpu-burn) [[ $# -ge 2 ]] || die "--gpu-burn requires a value"; GPU_BURN_BIN=$2; GPU_BURN_DIR=$(dirname "$2"); shift 2 ;;
+        --host) [[ $# -ge 2 ]] || die_code 2 "--host requires a value"; MODE=ssh; TARGET_HOST=$2; shift 2 ;;
+        --profile) [[ $# -ge 2 ]] || die_code 2 "--profile requires a value"; PROFILE=$2; shift 2 ;;
+        --power) [[ $# -ge 2 ]] || die_code 2 "--power requires a value"; POWER_LIMIT=$2; shift 2 ;;
+        --time) [[ $# -ge 2 ]] || die_code 2 "--time requires a value"; TEST_TIME=$2; TIME_EXPLICIT=1; shift 2 ;;
+        --cooldown) [[ $# -ge 2 ]] || die_code 2 "--cooldown requires a value"; COOLDOWN=$2; COOLDOWN_EXPLICIT=1; shift 2 ;;
+        --interval) [[ $# -ge 2 ]] || die_code 2 "--interval requires a value"; INTERVAL=$2; shift 2 ;;
+        --output) [[ $# -ge 2 ]] || die_code 2 "--output requires a value"; OUTPUT_ROOT=$2; shift 2 ;;
+        --cuda-home) [[ $# -ge 2 ]] || die_code 2 "--cuda-home requires a value"; CUDA_HOME_OVERRIDE=$2; shift 2 ;;
+        --gpu-burn) [[ $# -ge 2 ]] || die_code 2 "--gpu-burn requires a value"; GPU_BURN_BIN=$2; GPU_BURN_DIR=$(dirname "$2"); shift 2 ;;
+        --max-start-temp) [[ $# -ge 2 ]] || die_code 2 "--max-start-temp requires a value"; MAX_START_TEMP=$2; shift 2 ;;
+        --min-free-mb) [[ $# -ge 2 ]] || die_code 2 "--min-free-mb requires a value"; MIN_FREE_MB=$2; shift 2 ;;
+        --force) FORCE_RUN=1; shift ;;
         --continue-on-failure) STOP_ON_FAILURE=0; shift ;;
-        --inventory-only) INVENTORY_ONLY=1; shift ;;
+        --inventory-only) PROFILE=inventory; shift ;;
         --version) printf 'gpu-sentry %s\n' "$GPU_SENTRY_VERSION"; exit 0 ;;
         -h|--help) usage; exit 0 ;;
-        *) usage >&2; die "Unknown option: $1" ;;
+        *) usage >&2; die_code 2 "Unknown option: $1" ;;
     esac
 done
 
-[[ -n $MODE ]] || { usage >&2; die "Choose exactly one of --local or --host"; }
-for numeric in POWER_LIMIT TEST_TIME COOLDOWN INTERVAL; do
-    value=${!numeric}; [[ $value =~ ^[0-9]+$ ]] || die "$numeric must be a non-negative integer"
+[[ -n $MODE ]] || { usage >&2; die_code 2 "Choose exactly one of --local or --host"; }
+apply_profile
+for numeric in POWER_LIMIT TEST_TIME COOLDOWN INTERVAL MAX_START_TEMP MIN_FREE_MB; do
+    value=${!numeric}; [[ $value =~ ^[0-9]+$ ]] || die_code 2 "$numeric must be a non-negative integer"
 done
-(( TEST_TIME > 0 && INTERVAL > 0 )) || die "--time and --interval must be greater than zero"
+(( TEST_TIME > 0 && INTERVAL > 0 )) || die_code 2 "--time and --interval must be greater than zero"
 
 REPORT_HOST=$(safe_name "$TARGET_HOST")
 RUN_DATE=$(date +%Y%m%d)
 RUN_DIR="$OUTPUT_ROOT/$RUN_DATE/$REPORT_HOST"
 mkdir -p "$RUN_DIR"
 MAIN_LOG=$RUN_DIR/main.log; GPU_CSV=$RUN_DIR/gpu.csv; DMESG_LOG=$RUN_DIR/dmesg.log
-HTML_REPORT=$RUN_DIR/report.html; PDF_REPORT=$RUN_DIR/report.pdf
+HTML_REPORT=$RUN_DIR/report.html; PDF_REPORT=$RUN_DIR/report.pdf; JSON_REPORT=$RUN_DIR/report.json
 HARDWARE_TSV=$RUN_DIR/hardware.tsv; GPU_INVENTORY=$RUN_DIR/gpu-inventory.csv
 GPU_DETAIL_LOG=$RUN_DIR/gpu-detail.log; PCIE_LOG=$RUN_DIR/pcie-topology.log
 VENDOR_LOG=$RUN_DIR/vendor.log; TEST_PLAN=$RUN_DIR/test-plan.tsv
 RESULTS_TSV=$RUN_DIR/results.tsv; ANALYSIS_TSV=$RUN_DIR/analysis.tsv
+PREFLIGHT_TSV=$RUN_DIR/preflight.tsv; DCGM_LOG=$RUN_DIR/dcgm.log; DCGM_JSON=$RUN_DIR/dcgm.json
 ORIGINAL_POWER_LIMITS=$RUN_DIR/original-power-limits.tsv
 GPU_MONITOR_PID=""
 
@@ -104,23 +123,40 @@ collect_vendor_data
 collect_gpu_inventory
 generate_test_plan "$GPU_COUNT"
 printf 'test\tdevices\tstarted\tended\tresult\trc\n' >"$RESULTS_TSV"
-stress_rc=0
-if (( INVENTORY_ONLY == 0 )); then
+safety_blocked=0; stress_rc=0; DCGM_STATUS=SKIPPED; PREFLIGHT_STATUS=SKIPPED
+: >"$PREFLIGHT_TSV"
+if (( INVENTORY_ONLY == 0 )) && ! run_preflight_checks; then
+    safety_blocked=1
+    log ERROR "Safety preflight blocked stress testing; review $PREFLIGHT_TSV or use --force after assessing the risk"
+fi
+if (( INVENTORY_ONLY == 0 && safety_blocked == 0 )); then
+    run_dcgm_diagnostics
     install_gpu_burn
     apply_power_limit
     start_gpu_monitor
     run_stress_tests || stress_rc=$?
     stop_gpu_monitor
 else
-    log INFO "Inventory-only mode: stress tests skipped"
+    (( INVENTORY_ONLY )) && log INFO "Inventory profile: stress tests skipped"
     transport_exec 'nvidia-smi --query-gpu=timestamp,index,uuid,name,temperature.gpu,power.draw,power.limit,utilization.gpu,utilization.memory,memory.used,memory.total,pstate,clocks.sm --format=csv,noheader,nounits' >"$GPU_CSV" 2>>"$MAIN_LOG" || true
     sed -i '1i timestamp,index,uuid,name,temp_c,power_w,power_limit_w,gpu_util_pct,memory_util_pct,memory_used_mib,memory_total_mib,pstate,sm_clock_mhz' "$GPU_CSV"
 fi
 collect_kernel_logs
 analyze_logs
 (( stress_rc == 0 )) || OVERALL_STATUS=FAIL
+if [[ $DCGM_STATUS == FAIL ]]; then
+    OVERALL_STATUS=FAIL
+    printf 'FAIL\tDCGM diagnostic\tDCGM reported an active health or diagnostic failure\tReview dcgm.json and dcgm.log; isolate affected GPUs before returning the node to service.\n' >>"$ANALYSIS_TSV"
+fi
+if (( safety_blocked )); then
+    OVERALL_STATUS=FAIL
+    printf 'FAIL\tSafety preflight\tOne or more conditions made stress testing unsafe\tReview preflight.tsv, clear active workloads or platform risks, and rerun without --force.\n' >>"$ANALYSIS_TSV"
+fi
+generate_json_report
 generate_html_report
 generate_pdf_report
 restore_power_limits
 log INFO "Completed with status $OVERALL_STATUS; report: $HTML_REPORT"
-(( stress_rc == 0 ))
+if (( safety_blocked )); then exit 7; fi
+if (( stress_rc != 0 )) || [[ $DCGM_STATUS == FAIL ]]; then exit 5; fi
+exit 0

@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-GPU_SENTRY_VERSION="0.4.1"
+GPU_SENTRY_VERSION="0.5.0"
 
 die() {
+    die_code 1 "$*"
+}
+
+die_code() {
+    local code=$1
+    shift
     log ERROR "$*"
-    exit 1
+    exit "$code"
 }
 
 log() {

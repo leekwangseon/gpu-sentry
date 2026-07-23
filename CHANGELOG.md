@@ -5,6 +5,22 @@ this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-23
+
+### Added
+
+- Inventory, quick, standard, burn-in, and RMA diagnostic profiles.
+- Safety preflight checks for active GPU processes, temperature, MIG, power
+  limits, Slurm allocations, and local report storage.
+- Optional NVIDIA DCGM diagnostics with consumer-GPU level capping.
+- Versioned `report.json`, preflight evidence, DCGM evidence, and stable outcome
+  exit codes.
+
+### Changed
+
+- Unsafe stress runs now stop with exit code 7 unless `--force` is explicit.
+- Diagnostic failures now return exit code 5 while still generating reports.
+
 ## [0.4.1] - 2026-07-22
 
 ### Fixed
@@ -52,7 +68,8 @@ this project follows [Semantic Versioning](https://semver.org/).
 - Extensible Dell, Lenovo, and IPMI vendor collectors.
 - ShellCheck and release automation.
 
-[Unreleased]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/leekwangseon/gpu-sentry/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/leekwangseon/gpu-sentry/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leekwangseon/gpu-sentry/compare/v0.2.0...v0.3.0

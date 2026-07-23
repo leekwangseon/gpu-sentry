@@ -15,7 +15,7 @@ install_gpu_burn() {
         archive_remote=""
     fi
 
-    [[ $CUDA_HOME_DETECTED != unknown ]] || die "CUDA Toolkit is required to build gpu-burn; specify --cuda-home if auto-discovery failed"
+    [[ $CUDA_HOME_DETECTED != unknown ]] || die_code 4 "CUDA Toolkit is required to build gpu-burn; specify --cuda-home if auto-discovery failed"
     log INFO "Installing gpu-burn with CUDA at $CUDA_HOME_DETECTED; privileges may be required for $GPU_BURN_DIR"
     transport_stream_script "$GPU_BURN_DIR" "$GPU_BURN_REPO" "$GPU_BURN_ARCHIVE" "$archive_remote" "$CUDA_HOME_DETECTED" \
         >>"$MAIN_LOG" 2>&1 <<'INSTALL_SCRIPT'
