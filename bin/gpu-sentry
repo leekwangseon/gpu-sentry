@@ -20,6 +20,8 @@ source "$LIB_DIR/ssh.sh"
 source "$LIB_DIR/hardware.sh"
 # shellcheck source=../lib/profile.sh
 source "$LIB_DIR/profile.sh"
+# shellcheck source=../lib/ui.sh
+source "$LIB_DIR/ui.sh"
 # shellcheck source=../lib/preflight.sh
 source "$LIB_DIR/preflight.sh"
 # shellcheck source=../lib/cuda.sh
@@ -39,9 +41,11 @@ source "$LIB_DIR/report.sh"
 
 usage() {
     cat <<'USAGE'
-Usage: gpu-sentry (--local | --host HOST) [options]
+Usage: gpu-sentry [--interactive]
+       gpu-sentry (--local | --host HOST) [options]
 
 Options:
+  --interactive           Open the guided interactive configuration UI
   --local                 Diagnose this server
   --host HOST             Diagnose a server over SSH
   --profile NAME          inventory, quick, standard, burn-in, or rma
@@ -68,6 +72,14 @@ GPU_BURN_REPO=https://github.com/wilicc/gpu-burn.git
 GPU_BURN_ARCHIVE=https://github.com/wilicc/gpu-burn/archive/refs/heads/master.tar.gz
 STOP_ON_FAILURE=1; INVENTORY_ONLY=0; CUDA_HOME_OVERRIDE=""; FORCE_RUN=0
 MAX_START_TEMP=80; MIN_FREE_MB=500; TIME_EXPLICIT=0; COOLDOWN_EXPLICIT=0
+INTERACTIVE_MODE=0
+
+if (($# == 0)) || [[ $# -eq 1 && $1 == --interactive ]]; then
+    [[ -t 0 && -t 1 ]] || { usage >&2; die_code 2 "Interactive mode requires a terminal"; }
+    (($# == 1)) && shift
+    INTERACTIVE_MODE=1
+    interactive_configure
+fi
 
 while (($#)); do
     case $1 in
@@ -116,6 +128,7 @@ GPU_MONITOR_PID=""
 cleanup() { stop_gpu_monitor; restore_power_limits; }
 trap cleanup EXIT INT TERM
 
+(( INTERACTIVE_MODE )) || print_banner >&2
 log INFO "gpu-sentry $GPU_SENTRY_VERSION starting for $TARGET_HOST ($MODE)"
 transport_check
 collect_hardware

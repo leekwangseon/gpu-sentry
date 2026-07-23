@@ -16,7 +16,7 @@ generate_json_report() {
     {
         printf '{\n'
         printf '  "schema_version": "1.0",\n'
-        printf '  "tool": {"name": "gpu-sentry", "version": "%s"},\n' "$(json_escape "$GPU_SENTRY_VERSION")"
+        printf '  "tool": {"name": "gpu-sentry", "version": "%s", "powered_by": "D-Aquila"},\n' "$(json_escape "$GPU_SENTRY_VERSION")"
         printf '  "host": "%s",\n' "$(json_escape "$REPORT_HOST")"
         printf '  "profile": "%s",\n' "$(json_escape "$PROFILE")"
         printf '  "status": "%s",\n' "$(json_escape "$OVERALL_STATUS")"

@@ -18,6 +18,8 @@ source "$ROOT/lib/profile.sh"
 source "$ROOT/lib/json.sh"
 # shellcheck source=../lib/preflight.sh
 source "$ROOT/lib/preflight.sh"
+# shellcheck source=../lib/ui.sh
+source "$ROOT/lib/ui.sh"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -28,6 +30,29 @@ set +e
 invalid_profile_rc=$?
 set -e
 [[ $invalid_profile_rc -eq 2 ]]
+
+set +e
+"$ROOT/bin/gpu-sentry" --interactive </dev/null >/dev/null 2>&1
+non_tty_rc=$?
+set -e
+[[ $non_tty_rc -eq 2 ]]
+
+UI_BACKEND=text
+[[ $(printf '2\n' | ui_choose "Target" local "Local" ssh "Remote") == ssh ]]
+[[ $(printf '\n' | ui_input "Value" "default") == default ]]
+print_banner | grep -q 'Powered by D-Aquila'
+interactive_result=$(
+    printf '1\n2\n0\n\n\n\n\nn\ny\n' |
+        (
+            MODE=''; TARGET_HOST=''; PROFILE=standard; POWER_LIMIT=0; TEST_TIME=300; COOLDOWN=60; INTERVAL=2
+            OUTPUT_ROOT=/tmp/reports; GPU_BURN_DIR=/opt/gpu-burn; GPU_BURN_BIN=$GPU_BURN_DIR/gpu_burn
+            STOP_ON_FAILURE=1; INVENTORY_ONLY=0; CUDA_HOME_OVERRIDE=''; FORCE_RUN=0
+            MAX_START_TEMP=80; MIN_FREE_MB=500; TIME_EXPLICIT=0; COOLDOWN_EXPLICIT=0
+            GPU_SENTRY_UI_BACKEND=text interactive_configure
+            printf '%s|%s|%s|%s|%s' "$MODE" "$TARGET_HOST" "$PROFILE" "$TEST_TIME" "$COOLDOWN"
+        ) 2>/dev/null
+)
+[[ $interactive_result == 'local|localhost|quick|60|5' ]]
 
 PROFILE=quick; INVENTORY_ONLY=0; TIME_EXPLICIT=0; COOLDOWN_EXPLICIT=0; TEST_TIME=300; COOLDOWN=60
 apply_profile

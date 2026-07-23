@@ -6,6 +6,10 @@ CUDA discovery, profiles, safety preflight, DCGM, analysis, JSON, and reporting.
 All remote commands go through `lib/ssh.sh`, allowing
 collectors to work unchanged in local and SSH modes.
 
+`lib/ui.sh` provides `dialog`, `whiptail`, and plain-text frontends that populate
+the same configuration variables used by the CLI parser. The diagnostic engine
+therefore has one execution path for interactive and automated operation.
+
 Vendor support is capability-based. Dell uses racadm/OMSA, Lenovo uses OneCLI,
 and other platforms use IPMI when present. Future vendor collectors should emit
 plain logs and must not make configuration changes.

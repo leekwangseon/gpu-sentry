@@ -1,5 +1,7 @@
 # GPU Sentry
 
+> **Powered by D-Aquila**
+
 `gpu-sentry`는 NVIDIA GPU 서버를 현장에서 진단하기 위한 로컬 및 SSH 기반 도구입니다.
 서버 하드웨어를 자동으로 탐지하고, GPU 구성에 맞는 스트레스 테스트를 생성하며,
 원본 로그 수집과 장애 징후 분석을 수행한 뒤 고객 제출용 HTML 및 PDF 보고서를 만듭니다.
@@ -37,6 +39,9 @@ git clone https://github.com/leekwangseon/gpu-sentry.git
 cd gpu-sentry
 chmod +x bin/gpu-sentry
 
+# 인자 없이 실행하면 대화형 설정 화면이 열립니다.
+./bin/gpu-sentry
+
 # 로컬 서버 진단
 sudo ./bin/gpu-sentry --local --power 300 --time 600
 
@@ -63,6 +68,7 @@ gpu-burn을 설치하거나 스트레스 테스트를 실행하지 않고 하드
 
 | 옵션 | 설명 | 기본값 |
 | --- | --- | --- |
+| `--interactive` | 단계별 대화형 설정 화면을 엽니다. | 인자가 없을 때 자동 실행 |
 | `--local` | 현재 서버를 직접 진단합니다. | - |
 | `--host HOST` | 지정한 서버를 SSH로 진단합니다. | - |
 | `--profile NAME` | `inventory`, `quick`, `standard`, `burn-in`, `rma` 중 하나를 선택합니다. | `standard` |
@@ -78,6 +84,29 @@ gpu-burn을 설치하거나 스트레스 테스트를 실행하지 않고 하드
 | `--force` | 안전 검사 실패를 확인하고 강제로 계속합니다. | 비활성화 |
 | `--continue-on-failure` | 테스트 하나가 실패해도 나머지 테스트를 계속합니다. | 즉시 중단 |
 | `--inventory-only` | 설치와 스트레스 테스트를 생략하고 정보만 수집합니다. | 비활성화 |
+
+## 대화형 실행
+
+옵션을 외우지 않아도 인자 없이 실행하면 대화형 설정 화면이 시작됩니다.
+
+```bash
+./bin/gpu-sentry
+```
+
+`dialog`가 설치되어 있으면 전체 화면 TUI, `whiptail`이 있으면 whiptail 창을
+사용합니다. 둘 다 없으면 별도 설치 없이 번호를 선택하는 순수 Bash 메뉴로
+자동 전환됩니다. 메뉴에서 다음 항목을 조합할 수 있습니다.
+
+- 로컬 또는 SSH 대상 서버
+- inventory/quick/standard/burn-in/rma 프로파일
+- GPU 전력 제한, 테스트 시간, 쿨다운, 텔레메트리 간격
+- 시작 온도 안전 기준
+- CUDA Toolkit과 gpu-burn 경로
+- 보고서 저장 위치와 최소 여유 공간
+- 테스트 실패 후 계속 여부와 안전 검사 강제 진행 여부
+
+마지막 화면에서 선택한 설정을 확인한 후에만 실제 진단을 시작합니다. 기존 CLI
+옵션은 자동화, Ansible, 스케줄러 및 반복 실행을 위해 그대로 지원합니다.
 
 `--power`에 0보다 큰 값을 지정하면 스트레스 테스트 전에 `nvidia-smi -pl`로
 모든 GPU에 전력 제한을 적용합니다. 프로그램 종료 시에는 수집해 둔 원래 전력 제한으로
